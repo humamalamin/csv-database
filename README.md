@@ -49,6 +49,7 @@ Update the database configuration in `main.go`:
 ```go
 // Database Configuration
 dbConfig := db.Config{
+    Driver:     "postgres or mysql",
     Host:        "localhost",
     Port:        5432,
     User:        "postgres",
@@ -73,52 +74,30 @@ go run main.go
 ## Usage
 
 ### Library Integration
-You can use the modules in your own project by importing the packages:
+Import the library and call `ProcessCSVToDatabase`:
 
 #### Example: Using the Database Module
 ```go
 import (
-    "csv_processor/db"
+    "github.com/humamalamin/csv-database/db"
 )
 
 func main() {
-    dbConfig := db.Config{
-        Host:        "localhost",
-        Port:        5432,
-        User:        "postgres",
-        Password:    "your_password",
-        DBName:      "your_database",
-        MaxConns:    20,
-        MaxIdleConns: 10,
-    }
+    dbConfig := db.ConfigDB{
+		Driver:       "postgres",
+		Host:         "localhost",
+		Port:         5432,
+		User:         "postgres",
+		Password:     "lokal",
+		DBName:       "csv_database",
+		MaxConns:     20,
+		MaxIdleConns: 10,
+	}
 
-    database, err := db.OpenConnection(dbConfig)
+    err := ProcessCSVToDatabase(dbConfig, "file.csv", "table_name", 10)
     if err != nil {
         log.Fatal(err)
     }
-    defer database.Close()
-}
-```
-
-#### Example: Reading CSV Files
-```go
-import (
-    "csv_processor/csv"
-)
-
-func main() {
-    csvReader, file, err := csv.OpenCsvFile("path/to/your-file.csv")
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer file.Close()
-
-    headers, err := csv.ReadHeaders(csvReader)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    log.Println("CSV Headers:", headers)
 }
 ```
 

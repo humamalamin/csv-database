@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func InsertBatch(db *sql.DB, tableName string, headers []string, batch [][]interface{}) error {
+func InsertBatch(db *sql.DB, tableName string, headers []string, batch [][]interface{}, driver string) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -16,7 +16,7 @@ func InsertBatch(db *sql.DB, tableName string, headers []string, batch [][]inter
 	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
 		tableName,
 		strings.Join(headers, ","),
-		strings.Join(generateQuestionsMark(len(headers)), ","),
+		strings.Join(generateQuestionsMark(len(headers), driver), ","),
 	)
 
 	stmt, err := tx.Prepare(query)
@@ -34,10 +34,15 @@ func InsertBatch(db *sql.DB, tableName string, headers []string, batch [][]inter
 	return tx.Commit()
 }
 
-func generateQuestionsMark(n int) []string {
+func generateQuestionsMark(n int, driver string) []string {
 	s := make([]string, n)
 	for i := 1; i <= n; i++ {
-		s[i-1] = fmt.Sprintf("$%d", i)
+		if driver == "postgres" {
+			s[i-1] = fmt.Sprintf("$%d", i)
+		} else if driver == "mysql" {
+			s = append(s, "?")
+		}
+
 	}
 	return s
 }

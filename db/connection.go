@@ -4,9 +4,13 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 )
 
 type ConfigDB struct {
+	Driver       string
 	Host         string
 	Port         int
 	User         string
@@ -18,10 +22,18 @@ type ConfigDB struct {
 
 func OpenDbConnection(cfg ConfigDB) (*sql.DB, error) {
 	log.Println("=> open db connection")
-	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName)
+	psqlconn := ""
+	switch cfg.Driver {
+	case "postgres":
+		psqlconn = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+			cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName)
+	case "mysql":
+		psqlconn = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.DBName)
+	default:
+		return nil, fmt.Errorf("unsupported driver: %s", cfg.Driver)
+	}
 
-	db, err := sql.Open("postgres", psqlconn)
+	db, err := sql.Open(cfg.Driver, psqlconn)
 	if err != nil {
 		return nil, err
 	}
