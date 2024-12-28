@@ -20,7 +20,7 @@ func main() {
 		MaxIdleConns: 10,
 	}
 
-	err := utils.ProcessCSVToDatabase(dbConfig, "annual-enterprise-survey-2023-financial-year-provisional-size-bands.csv", "annual_enterprise", 10)
+	err := utils.ProcessCSVToDatabase(dbConfig, "customers-2000000.csv", "customers", 10)
 	if err != nil {
 		log.Fatal(err)
 	}

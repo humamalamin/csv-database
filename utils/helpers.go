@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/humamalamin/csv-database/csv"
 	dbRepo "github.com/humamalamin/csv-database/db"
 	"github.com/humamalamin/csv-database/worker"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func LogProgress(workerIndex, counter, step int) {
@@ -24,13 +26,6 @@ func ProcessCSVToDatabase(
 ) error {
 	start := time.Now()
 
-	// Buka koneksi database
-	database, err := dbRepo.OpenDbConnection(dbConfig)
-	if err != nil {
-		return err
-	}
-	defer database.Close()
-
 	// Buka file CSV
 	csvReader, file, err := csv.OpenCsvFile(csvFilePath)
 	if err != nil {
@@ -46,11 +41,45 @@ func ProcessCSVToDatabase(
 
 	// Worker processing
 	jobs := make(chan []interface{})
-	go worker.DispatchWorkers(database, jobs, workerCount, func(workerIndex int, db *sql.DB, job []interface{}) {
-		if err := dbRepo.InsertBatch(db, tableName, headers, [][]interface{}{job}, dbConfig.Driver); err != nil {
-			log.Printf("Worker %d failed: %v", workerIndex, err)
+
+	switch dbConfig.Driver {
+	case "postgres":
+		conectDB, err := dbRepo.OpenConnectPostgres(dbConfig)
+		if err != nil {
+			return err
 		}
-	})
+
+		dbConn, err := conectDB.Acquire(context.Background())
+		if err != nil {
+			log.Fatalf("Failed to acquire connection: %v", err)
+		}
+		defer dbConn.Release()
+
+		go worker.DispatchWorkersPsql(dbConn, jobs, worker.WorkerConfig{
+			WorkerCount: 10,
+			BatchSize:   500,
+		}, func(workerIndex int, db *pgxpool.Conn, batch [][]interface{}) {
+			if err := dbRepo.BulkInsertWithTransactionPsql(dbConn, tableName, headers, batch, dbConfig.Driver, 10000); err != nil {
+				log.Printf("Worker %d failed: %v", workerIndex, err)
+			}
+		})
+	case "mysql":
+		conectDB, err := dbRepo.OpenConnectMysql(dbConfig)
+		if err != nil {
+			return err
+		}
+
+		defer conectDB.Close()
+
+		go worker.DispatchWorkersMysql(conectDB, jobs, worker.WorkerConfig{
+			WorkerCount: 10,
+			BatchSize:   500,
+		}, func(workerIndex int, db *sql.DB, batch [][]interface{}) {
+			if err := dbRepo.BulkInsertWithTransactionMysql(db, tableName, headers, batch, dbConfig.Driver, 10000); err != nil {
+				log.Printf("Worker %d failed: %v", workerIndex, err)
+			}
+		})
+	}
 
 	// Kirim data ke worker
 	for {
@@ -64,6 +93,7 @@ func ProcessCSVToDatabase(
 
 	duration := time.Since(start)
 	log.Printf("Processed CSV to database in %s\n", duration)
+
 	return nil
 }
 
