@@ -40,7 +40,7 @@ func generateQuestionsMark(n int, driver string) []string {
 		if driver == "postgres" {
 			s[i-1] = fmt.Sprintf("$%d", i)
 		} else if driver == "mysql" {
-			s = append(s, "?")
+			s[i-1] = "?"
 		}
 
 	}
